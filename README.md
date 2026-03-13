@@ -26,6 +26,12 @@ cat your_image.ppm | ./main
 
 Close the window to exit. That's literally all there is to it.
 
+## Sample Image
+A sample PPM file (`sample_1280×853.ppm`) is included in the repo so you can test it right away:
+```bash
+cat sample_1280×853.ppm | ./main
+```
+
 ## Screenshots
 
 ![screenshot](screenshot.png)
