@@ -28,7 +28,7 @@ Close the window to exit. That's literally all there is to it.
 
 ## Screenshots
 
-> `![screenshot](screenshot.png)`
+![screenshot](screenshot.png)
 
 ## Notes
 
