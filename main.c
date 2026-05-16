@@ -114,12 +114,13 @@ int main(int argc, char *argv[]) {
     read_ppm_header();
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *window = SDL_CreateWindow("Image Viewer", width, height, 0);
-    SDL_Surface *surface = SDL_GetWindowSurface(window);
-    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(surface->format);
+    SDL_Window *window = SDL_CreateWindow("Image Viewer", width, height, SDL_WINDOW_RESIZABLE);
+    
+    SDL_Surface *image_surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_XRGB8888);
+    const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(image_surface->format);
 
-    SDL_LockSurface(surface);
-    Uint32 *pixels = (Uint32*)surface->pixels;
+    SDL_LockSurface(image_surface);
+    Uint32 *pixels = (Uint32*)image_surface->pixels;
     
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
@@ -131,23 +132,62 @@ int main(int argc, char *argv[]) {
                 read_pixel_p6(fp,&r, &g, &b);
             }
 
-            pixels[y * (surface->pitch / 4) + x] = SDL_MapRGB(fmt, NULL, r, g, b);
+            pixels[y * (image_surface->pitch / 4) + x] = SDL_MapRGB(fmt, NULL, r, g, b);
         }
     }
 
-    SDL_UnlockSurface(surface);
+    SDL_UnlockSurface(image_surface);
 
     is_pipe ? pclose(fp) : fclose(fp);
 
-    SDL_UpdateWindowSurface(window);
-
     SDL_Event event;
     int running = 1;
+    int needs_redraw = 1;
+
     while (running) {
-        while (SDL_PollEvent(&event))
-            if (event.type == SDL_EVENT_QUIT) running = 0;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_EVENT_QUIT) {
+                running = 0;
+            } else if (event.type == SDL_EVENT_WINDOW_EXPOSED || 
+                       event.type == SDL_EVENT_WINDOW_RESIZED || 
+                       event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+                       event.type == SDL_EVENT_WINDOW_RESTORED ||
+                       event.type == SDL_EVENT_WINDOW_MAXIMIZED) {
+                needs_redraw = 1;
+            }
+        }
+
+        if (needs_redraw) {
+            SDL_Surface *win_surface = SDL_GetWindowSurface(window);
+            if (win_surface) {
+                SDL_Rect dst_rect;
+                float img_aspect = (float)image_surface->w / image_surface->h;
+                float win_aspect = (float)win_surface->w / win_surface->h;
+                
+                if (img_aspect > win_aspect) {
+                    dst_rect.w = win_surface->w;
+                    dst_rect.h = (int)(win_surface->w / img_aspect);
+                    dst_rect.x = 0;
+                    dst_rect.y = (win_surface->h - dst_rect.h) / 2;
+                } else {
+                    dst_rect.h = win_surface->h;
+                    dst_rect.w = (int)(win_surface->h * img_aspect);
+                    dst_rect.y = 0;
+                    dst_rect.x = (win_surface->w - dst_rect.w) / 2;
+                }
+                
+                const SDL_PixelFormatDetails *win_fmt = SDL_GetPixelFormatDetails(win_surface->format);
+                SDL_FillSurfaceRect(win_surface, NULL, SDL_MapRGB(win_fmt, NULL, 0, 0, 0));
+                SDL_BlitSurfaceScaled(image_surface, NULL, win_surface, &dst_rect, SDL_SCALEMODE_LINEAR);
+                SDL_UpdateWindowSurface(window);
+            }
+            needs_redraw = 0;
+        }
+
+        SDL_Delay(16);
     }
 
+    SDL_DestroySurface(image_surface);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
